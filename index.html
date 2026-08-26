@@ -295,7 +295,7 @@
    KONFIGURASI — GANTI DENGAN URL WEB APP APPS SCRIPT ANDA
    ========================================================================== */
 const CONFIG = {
-  API_URL: 'https://script.google.com/macros/s/AKfycbw1PGHMuDWa1fmUV_xpq7m0GqDE1c9c5rSHOQn18h8nPpYrxfdoA_64_Q9AoB3KvaAxoQ/exec'
+API_URL: 'https://script.google.com/macros/s/AKfycbw1PGHMuDWa1fmUV_xpq7m0GqDE1c9c5rSHOQn18h8nPpYrxfdoA_64_Q9AoB3KvaAxoQ/exec'
 };
 
 /* ==========================================================================
@@ -307,19 +307,50 @@ let todayScans = []; // cache scan lokal untuk PIC view
 let html5QrCode = null;
 
 /* ==========================================================================
-   HELPER: panggil backend via GET (menghindari CORS preflight)
+   HELPER: panggil backend via JSONP (menghindari blokir CORS browser
+   saat frontend di-hosting di domain lain seperti GitHub Pages)
    ========================================================================== */
-async function api(action, params) {
-  params = params || {};
-  const url = new URL(CONFIG.API_URL);
-  url.searchParams.set('action', action);
-  Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
-  try {
-    const res = await fetch(url.toString(), { method: 'GET' });
-    return await res.json();
-  } catch (err) {
-    return { ok: false, error: 'Tidak bisa menghubungi server. Cek koneksi internet / URL backend.' };
-  }
+function api(action, params) {
+  return new Promise((resolve) => {
+    params = params || {};
+    const callbackName = 'jsonpCb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    const url = new URL(CONFIG.API_URL);
+    url.searchParams.set('action', action);
+    Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
+    url.searchParams.set('callback', callbackName);
+
+    let settled = false;
+    const cleanup = () => {
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      clearTimeout(timeoutId);
+    };
+
+    window[callbackName] = function (data) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(data);
+    };
+
+    const script = document.createElement('script');
+    script.src = url.toString();
+    script.onerror = function () {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve({ ok: false, error: 'Tidak bisa menghubungi server. Cek koneksi internet / URL backend.' });
+    };
+
+    const timeoutId = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve({ ok: false, error: 'Server tidak merespons (timeout). Coba lagi.' });
+    }, 15000);
+
+    document.body.appendChild(script);
+  });
 }
 
 /* ==========================================================================
