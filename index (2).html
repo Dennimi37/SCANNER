@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Dispatch Scanner — Warehouse</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#14161B;
+    --panel:#1C1F27;
+    --panel-raised:#242832;
+    --line:#2E323D;
+    --text:#EDEFF3;
+    --text-dim:#9298A6;
+    --amber:#FFB020;
+    --amber-dim:#8A611A;
+    --green:#22C55E;
+    --red:#EF4444;
+    --blue:#3B82F6;
+    --radius:14px;
+    --mono: 'SFMono-Regular', Consolas, 'Roboto Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    -webkit-tap-highlight-color:transparent;}
+  #app{min-height:100%;display:flex;flex-direction:column;}
+  .hidden{display:none !important;}
+
+  /* ---------- Top bar ---------- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;
+    padding:14px 18px;background:var(--panel);border-bottom:1px solid var(--line);
+    position:sticky;top:0;z-index:20;}
+  .topbar .brand{display:flex;align-items:center;gap:10px;}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--amber);
+    box-shadow:0 0 8px var(--amber);}
+  .brand span{font-weight:700;letter-spacing:.3px;font-size:15px;}
+  .who{display:flex;align-items:center;gap:10px;}
+  .who .name{font-size:13px;color:var(--text-dim);}
+  .btn-logout{background:transparent;border:1px solid var(--line);color:var(--text-dim);
+    padding:7px 12px;border-radius:9px;font-size:12px;cursor:pointer;}
+  .btn-logout:active{background:var(--panel-raised);}
+
+  /* ---------- Login ---------- */
+  .login-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .login-card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);padding:28px 24px;}
+  .login-card h1{font-size:20px;margin:0 0 4px;}
+  .login-card p{color:var(--text-dim);font-size:13px;margin:0 0 22px;}
+  label{display:block;font-size:12px;color:var(--text-dim);margin-bottom:6px;margin-top:16px;}
+  select, input{width:100%;background:var(--panel-raised);border:1px solid var(--line);
+    color:var(--text);padding:14px;border-radius:10px;font-size:16px;}
+  select:focus, input:focus{outline:2px solid var(--amber);border-color:var(--amber);}
+  .pin-dots{display:flex;gap:10px;justify-content:center;margin:18px 0;}
+  .pin-dots .d{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);}
+  .pin-dots .d.filled{background:var(--amber);border-color:var(--amber);}
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;}
+  .keypad button{padding:16px;font-size:19px;font-weight:600;background:var(--panel-raised);
+    border:1px solid var(--line);color:var(--text);border-radius:10px;}
+  .keypad button:active{background:var(--line);}
+  .btn-primary{margin-top:18px;width:100%;padding:15px;border:none;border-radius:12px;
+    background:var(--amber);color:#191305;font-weight:700;font-size:15px;cursor:pointer;}
+  .btn-primary:active{background:#e0a01c;}
+  .err-box{margin-top:14px;background:#2A1616;border:1px solid #5c2626;color:#ff9a9a;
+    padding:10px 12px;border-radius:9px;font-size:13px;}
+
+  /* ---------- Nav (Supervisor/Admin) ---------- */
+  .tabs{display:flex;gap:6px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);
+    overflow-x:auto;position:sticky;top:57px;z-index:19;}
+  .tab{flex:0 0 auto;padding:9px 14px;border-radius:9px;font-size:13px;color:var(--text-dim);
+    background:transparent;border:1px solid transparent;cursor:pointer;white-space:nowrap;}
+  .tab.active{background:var(--panel-raised);color:var(--text);border-color:var(--line);}
+
+  .view{flex:1;padding:18px;max-width:1000px;width:100%;margin:0 auto;}
+
+  /* ---------- PIC Scan Screen ---------- */
+  .scan-header{text-align:center;padding:18px 0 8px;}
+  .scan-header .greet{color:var(--text-dim);font-size:13px;}
+  .scan-header .pic-name{font-size:26px;font-weight:800;margin-top:2px;}
+  .scan-header .pic-id{color:var(--amber);font-family:var(--mono);font-size:12px;margin-top:4px;}
+
+  .scan-box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;margin-top:16px;}
+  .resi-input{font-family:var(--mono);font-size:22px;letter-spacing:1px;text-align:center;
+    padding:20px;border-radius:12px;}
+  .scan-hint{text-align:center;color:var(--text-dim);font-size:12px;margin-top:10px;}
+  .btn-camera{margin-top:14px;width:100%;padding:16px;border-radius:12px;border:1px solid var(--line);
+    background:var(--panel-raised);color:var(--text);font-size:15px;font-weight:600;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:8px;}
+  #camReader{margin-top:14px;border-radius:12px;overflow:hidden;}
+
+  .today-strip{display:flex;gap:10px;margin-top:16px;}
+  .stat-mini{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:14px;text-align:center;}
+  .stat-mini .num{font-size:24px;font-weight:800;}
+  .stat-mini .lbl{font-size:11px;color:var(--text-dim);margin-top:2px;}
+
+  .recent-list{margin-top:16px;}
+  .recent-item{display:flex;justify-content:space-between;padding:12px 14px;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;margin-bottom:8px;font-size:13px;}
+  .recent-item .r-resi{font-family:var(--mono);font-weight:700;}
+  .recent-item .r-time{color:var(--text-dim);font-size:12px;}
+
+  /* ---------- Full screen feedback overlay ---------- */
+  .overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;text-align:center;padding:24px;animation:fadeIn .15s ease;}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  .overlay.success{background:var(--green);color:#06280f;}
+  .overlay.fail{background:var(--red);color:#2b0505;}
+  .overlay.warn{background:var(--amber);color:#2b1c02;}
+  .overlay .icon{font-size:72px;line-height:1;margin-bottom:10px;}
+  .overlay .title{font-size:26px;font-weight:800;margin-bottom:14px;}
+  .overlay .line{font-size:16px;margin:3px 0;font-family:var(--mono);}
+  .overlay .sub{font-size:13px;opacity:.85;margin-top:14px;}
+  .overlay .tapclose{margin-top:26px;font-size:12px;opacity:.7;}
+
+  /* ---------- Dashboard ---------- */
+  .filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+  .filters select, .filters input{width:auto;flex:1;min-width:120px;padding:9px 10px;font-size:13px;}
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px;}
+  .stat-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;}
+  .stat-card .n{font-size:26px;font-weight:800;}
+  .stat-card .l{font-size:11px;color:var(--text-dim);margin-top:4px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);}
+  th{color:var(--text-dim);font-weight:600;font-size:11px;text-transform:uppercase;}
+  tr:last-child td{border-bottom:none;}
+
+  .section-title{font-size:14px;font-weight:700;margin:22px 0 10px;color:var(--text-dim);
+    text-transform:uppercase;letter-spacing:.5px;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+  .badge.ok{background:#123b22;color:#4ade80;}
+  .badge.no{background:#3b1212;color:#f87171;}
+  .btn-sm{padding:7px 12px;font-size:12px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel-raised);color:var(--text);cursor:pointer;}
+  .btn-danger{background:#3b1212;border-color:#5c2626;color:#f87171;}
+  .btn-block{width:100%;margin-top:12px;}
+
+  .empty{text-align:center;color:var(--text-dim);padding:30px 10px;font-size:13px;}
+  ::placeholder{color:#5b6172;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== LOGIN VIEW ===================== -->
+  <div id="view-login" class="login-wrap">
+    <div class="login-card">
+      <h1>Dispatch Scanner</h1>
+      <p>Warehouse Packing Traceability</p>
+
+      <label>Pilih PIC</label>
+      <select id="loginPicSelect"></select>
+
+      <label>Masukkan PIN</label>
+      <div class="pin-dots" id="pinDots">
+        <div class="d"></div><div class="d"></div><div class="d"></div><div class="d"></div>
+      </div>
+      <input type="hidden" id="pinValue" value="">
+
+      <div class="keypad">
+        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+        <button data-k="clear">C</button><button data-k="0">0</button><button data-k="back">⌫</button>
+      </div>
+
+      <button class="btn-primary" id="btnLogin">Masuk</button>
+      <div id="loginErr" class="err-box hidden"></div>
+    </div>
+  </div>
+
+  <!-- ===================== MAIN APP (after login) ===================== -->
+  <div id="view-main" class="hidden">
+    <div class="topbar">
+      <div class="brand"><div class="dot"></div><span>DISPATCH SCANNER</span></div>
+      <div class="who">
+        <span class="name" id="topbarName">-</span>
+        <button class="btn-logout" id="btnLogout">Keluar</button>
+      </div>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <!-- ---- PIC: Scan view ---- -->
+    <div class="view" id="view-scan">
+      <div class="scan-header">
+        <div class="greet">Selamat bekerja,</div>
+        <div class="pic-name" id="scanPicName">-</div>
+        <div class="pic-id" id="scanPicId">-</div>
+      </div>
+
+      <div class="scan-box">
+        <input id="resiInput" class="resi-input" placeholder="Scan / ketik nomor resi" autocomplete="off" autofocus />
+        <div class="scan-hint">Tekan Enter setelah scan (scanner USB/Bluetooth otomatis Enter)</div>
+        <button class="btn-camera" id="btnOpenCamera">📷 Scan pakai kamera HP</button>
+        <div id="camReader" class="hidden"></div>
+      </div>
+
+      <div class="today-strip">
+        <div class="stat-mini"><div class="num" id="miniTotal">0</div><div class="lbl">Resi hari ini</div></div>
+      </div>
+
+      <div class="section-title">Scan Terakhir</div>
+      <div class="recent-list" id="recentList"><div class="empty">Belum ada scan hari ini</div></div>
+    </div>
+
+    <!-- ---- Supervisor/Admin: Dashboard ---- -->
+    <div class="view hidden" id="view-dashboard">
+      <div class="filters">
+        <select id="fRange">
+          <option value="today">Hari ini</option>
+          <option value="yesterday">Kemarin</option>
+          <option value="week">Minggu ini</option>
+          <option value="month">Bulan ini</option>
+          <option value="custom">Custom</option>
+        </select>
+        <input type="date" id="fFrom" class="hidden" />
+        <input type="date" id="fTo" class="hidden" />
+        <select id="fPic"><option value="">Semua PIC</option></select>
+        <button class="btn-sm" id="btnApplyFilter">Terapkan</button>
+        <button class="btn-sm" id="btnExport">⬇ Export CSV</button>
+      </div>
+
+      <div class="cards-grid" id="dashCards"></div>
+
+      <div class="section-title">Produktivitas per PIC</div>
+      <table id="tablePicProd">
+        <thead><tr><th>PIC</th><th>Nama</th><th>Paket</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- ---- Trace Order ---- -->
+    <div class="view hidden" id="view-trace">
+      <div class="card">
+        <label>Nomor Resi</label>
+        <input id="traceInput" placeholder="Masukkan nomor resi..." />
+        <button class="btn-primary" id="btnTrace">Cari</button>
+      </div>
+      <div id="traceResult" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- ---- Manage PIC (Admin only) ---- -->
+    <div class="view hidden" id="view-pic">
+      <div class="card">
+        <div class="section-title" style="margin-top:0;">Tambah PIC Baru</div>
+        <div class="field-row">
+          <div><label>PIC ID</label><input id="newPicId" placeholder="PIC07" /></div>
+          <div><label>Nama</label><input id="newPicNama" placeholder="Nama staff" /></div>
+        </div>
+        <div class="field-row">
+          <div><label>PIN (4 digit)</label><input id="newPicPin" placeholder="1234" maxlength="6" /></div>
+          <div><label>Role</label>
+            <select id="newPicRole">
+              <option value="PIC">PIC</option>
+              <option value="Supervisor">Supervisor</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-primary" id="btnAddPic">Tambah PIC</button>
+      </div>
+
+      <div class="section-title">Daftar PIC</div>
+      <table id="tablePicList">
+        <thead><tr><th>ID</th><th>Nama</th><th>Role</th><th>Status</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- ---- Audit Log (Admin only) ---- -->
+    <div class="view hidden" id="view-audit">
+      <div class="section-title" style="margin-top:0;">200 Aktivitas Terakhir</div>
+      <table id="tableAudit">
+        <thead><tr><th>Waktu</th><th>Actor</th><th>Role</th><th>Aksi</th><th>Detail</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- Full-screen feedback overlay -->
+  <div id="overlay" class="overlay hidden"></div>
+</div>
+
+<script>
+/* ==========================================================================
+   KONFIGURASI — GANTI DENGAN URL WEB APP APPS SCRIPT ANDA
+   ========================================================================== */
+const CONFIG = {
+  API_URL: 'PASTE_URL_DEPLOYMENT_APPS_SCRIPT_DI_SINI'
+};
+
+/* ==========================================================================
+   STATE
+   ========================================================================== */
+let session = JSON.parse(localStorage.getItem('wh_session') || 'null');
+let pinBuffer = '';
+let todayScans = []; // cache scan lokal untuk PIC view
+let html5QrCode = null;
+
+/* ==========================================================================
+   HELPER: panggil backend via GET (menghindari CORS preflight)
+   ========================================================================== */
+async function api(action, params) {
+  params = params || {};
+  const url = new URL(CONFIG.API_URL);
+  url.searchParams.set('action', action);
+  Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
+  try {
+    const res = await fetch(url.toString(), { method: 'GET' });
+    return await res.json();
+  } catch (err) {
+    return { ok: false, error: 'Tidak bisa menghubungi server. Cek koneksi internet / URL backend.' };
+  }
+}
+
+/* ==========================================================================
+   LOGIN FLOW
+   ========================================================================== */
+async function loadPicOptions() {
+  const sel = document.getElementById('loginPicSelect');
+  sel.innerHTML = '<option>Memuat...</option>';
+  const res = await api('listPic');
+  if (res.ok) {
+    sel.innerHTML = res.data
+      .filter(p => p.statusAktif === 'Aktif')
+      .map(p => `<option value="${p.picId}">${p.picId} — ${p.nama}</option>`)
+      .join('');
+  } else {
+    sel.innerHTML = '<option value="">Gagal memuat. Cek koneksi backend.</option>';
+  }
+}
+
+document.querySelectorAll('.keypad button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const k = btn.dataset.k;
+    if (k === 'clear') pinBuffer = '';
+    else if (k === 'back') pinBuffer = pinBuffer.slice(0, -1);
+    else if (pinBuffer.length < 6) pinBuffer += k;
+    renderPinDots();
+  });
+});
+function renderPinDots() {
+  const dots = document.querySelectorAll('#pinDots .d');
+  dots.forEach((d, i) => d.classList.toggle('filled', i < pinBuffer.length));
+}
+
+document.getElementById('btnLogin').addEventListener('click', async () => {
+  const picId = document.getElementById('loginPicSelect').value;
+  const errBox = document.getElementById('loginErr');
+  errBox.classList.add('hidden');
+  if (!picId || !pinBuffer) {
+    errBox.textContent = 'Pilih PIC dan masukkan PIN.';
+    errBox.classList.remove('hidden');
+    return;
+  }
+  const res = await api('login', { picId, pin: pinBuffer });
+  if (!res.ok) {
+    errBox.textContent = res.error || 'Login gagal.';
+    errBox.classList.remove('hidden');
+    pinBuffer = ''; renderPinDots();
+    return;
+  }
+  session = res.pic;
+  localStorage.setItem('wh_session', JSON.stringify(session));
+  enterApp();
+});
+
+document.getElementById('btnLogout').addEventListener('click', () => {
+  localStorage.removeItem('wh_session');
+  session = null;
+  location.reload();
+});
+
+/* ==========================================================================
+   ROUTING SETELAH LOGIN
+   ========================================================================== */
+function enterApp() {
+  document.getElementById('view-login').classList.add('hidden');
+  document.getElementById('view-main').classList.remove('hidden');
+  document.getElementById('topbarName').textContent = session.nama + ' (' + session.role + ')';
+
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = '';
+
+  if (session.role === 'PIC') {
+    tabs.classList.add('hidden');
+    showView('scan');
+    document.getElementById('scanPicName').textContent = session.nama;
+    document.getElementById('scanPicId').textContent = session.picId;
+    document.getElementById('resiInput').focus();
+  } else {
+    tabs.classList.remove('hidden');
+    const tabList = [
+      { id: 'scan', label: 'Scan' },
+      { id: 'dashboard', label: 'Dashboard' },
+      { id: 'trace', label: 'Trace Order' }
+    ];
+    if (session.role === 'Admin') {
+      tabList.push({ id: 'pic', label: 'Kelola PIC' });
+      tabList.push({ id: 'audit', label: 'Audit Log' });
+    }
+    tabList.forEach(t => {
+      const b = document.createElement('button');
+      b.className = 'tab'; b.textContent = t.label; b.dataset.view = t.id;
+      b.addEventListener('click', () => showView(t.id));
+      tabs.appendChild(b);
+    });
+    document.getElementById('scanPicName').textContent = session.nama;
+    document.getElementById('scanPicId').textContent = session.picId;
+    showView('dashboard');
+    loadDashboardFilters();
+  }
+}
+
+function showView(name) {
+  ['scan','dashboard','trace','pic','audit'].forEach(v => {
+    const el = document.getElementById('view-' + v);
+    if (el) el.classList.toggle('hidden', v !== name);
+  });
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === name));
+  if (name === 'dashboard') refreshDashboard();
+  if (name === 'pic') refreshPicList();
+  if (name === 'audit') refreshAuditLog();
+  if (name === 'scan') refreshTodayStats();
+}
+
+/* ==========================================================================
+   SCAN — input manual / USB-BT scanner (keyboard emulation) / kamera
+   ========================================================================== */
+const resiInput = document.getElementById('resiInput');
+resiInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const val = resiInput.value.trim();
+    if (val) processScan(val);
+    resiInput.value = '';
+  }
+});
+
+document.getElementById('btnOpenCamera').addEventListener('click', () => {
+  const reader = document.getElementById('camReader');
+  const btn = document.getElementById('btnOpenCamera');
+  if (reader.classList.contains('hidden')) {
+    reader.classList.remove('hidden');
+    btn.textContent = '✕ Tutup kamera';
+    html5QrCode = new Html5Qrcode('camReader');
+    html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: 220 },
+      (decodedText) => {
+        stopCamera();
+        processScan(decodedText.trim());
+      },
+      () => {}
+    ).catch(() => {
+      alert('Tidak bisa mengakses kamera. Pastikan izin kamera diaktifkan.');
+      stopCamera();
+    });
+  } else {
+    stopCamera();
+  }
+});
+function stopCamera() {
+  const reader = document.getElementById('camReader');
+  const btn = document.getElementById('btnOpenCamera');
+  if (html5QrCode) { html5QrCode.stop().catch(()=>{}); html5QrCode = null; }
+  reader.classList.add('hidden');
+  btn.textContent = '📷 Scan pakai kamera HP';
+}
+
+async function processScan(resi) {
+  const res = await api('scan', { resi, picId: session.picId, device: navigator.userAgent.slice(0,40) });
+  if (res.ok) {
+    showOverlay('success', '✓', 'BERHASIL', [
+      'Resi: ' + res.data.resi,
+      'PIC: ' + res.data.picName,
+      'Status: ' + res.data.status
+    ]);
+    todayScans.unshift(res.data);
+    renderRecentList();
+    updateMiniStats();
+  } else if (res.duplicate) {
+    showOverlay('warn', '⚠', 'RESI SUDAH TERDAFTAR', [
+      'Resi: ' + res.existing.resi,
+      'PIC: ' + res.existing.picId + ' - ' + res.existing.picName,
+      'Waktu: ' + res.existing.date + ' ' + res.existing.time
+    ]);
+  } else {
+    showOverlay('fail', '✕', 'RESI TIDAK VALID', [res.error || 'Gagal memproses resi']);
+  }
+  resiInput.focus();
+}
+
+function showOverlay(type, icon, title, lines) {
+  const ov = document.getElementById('overlay');
+  ov.className = 'overlay ' + type;
+  ov.innerHTML = `
+    <div class="icon">${icon}</div>
+    <div class="title">${title}</div>
+    ${lines.map(l => `<div class="line">${l}</div>`).join('')}
+    <div class="tapclose">tap layar untuk lanjut</div>`;
+  ov.classList.remove('hidden');
+  const closeFn = () => { ov.classList.add('hidden'); ov.removeEventListener('click', closeFn); };
+  ov.addEventListener('click', closeFn);
+  setTimeout(closeFn, type === 'success' ? 1400 : 3000);
+}
+
+function renderRecentList() {
+  const box = document.getElementById('recentList');
+  if (!todayScans.length) { box.innerHTML = '<div class="empty">Belum ada scan hari ini</div>'; return; }
+  box.innerHTML = todayScans.slice(0, 8).map(s => `
+    <div class="recent-item">
+      <span class="r-resi">${s.resi}</span>
+      <span class="r-time">${s.time || ''}</span>
+    </div>`).join('');
+}
+function updateMiniStats() {
+  document.getElementById('miniTotal').textContent = todayScans.length;
+}
+async function refreshTodayStats() {
+  renderRecentList();
+  updateMiniStats();
+}
+
+/* ==========================================================================
+   DASHBOARD (Supervisor / Admin)
+   ========================================================================== */
+document.getElementById('fRange').addEventListener('change', (e) => {
+  const isCustom = e.target.value === 'custom';
+  document.getElementById('fFrom').classList.toggle('hidden', !isCustom);
+  document.getElementById('fTo').classList.toggle('hidden', !isCustom);
+});
+document.getElementById('btnApplyFilter').addEventListener('click', refreshDashboard);
+document.getElementById('btnExport').addEventListener('click', doExport);
+
+async function loadDashboardFilters() {
+  const picRes = await api('listPic');
+  if (picRes.ok) {
+    const sel = document.getElementById('fPic');
+    sel.innerHTML = '<option value="">Semua PIC</option>' +
+      picRes.data.map(p => `<option value="${p.picId}">${p.nama}</option>`).join('');
+  }
+}
+
+function computeDateRange() {
+  const range = document.getElementById('fRange').value;
+  const fmt = d => d.toISOString().slice(0,10);
+  const today = new Date();
+  if (range === 'today') return { from: fmt(today), to: fmt(today) };
+  if (range === 'yesterday') {
+    const y = new Date(today); y.setDate(y.getDate()-1);
+    return { from: fmt(y), to: fmt(y) };
+  }
+  if (range === 'week') {
+    const start = new Date(today); start.setDate(start.getDate() - start.getDay());
+    return { from: fmt(start), to: fmt(today) };
+  }
+  if (range === 'month') {
+    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { from: fmt(start), to: fmt(today) };
+  }
+  return { from: document.getElementById('fFrom').value, to: document.getElementById('fTo').value };
+}
+
+async function refreshDashboard() {
+  const { from, to } = computeDateRange();
+  const res = await api('dashboard', {
+    picId: session.picId,
+    dateFrom: from, dateTo: to,
+    pic: document.getElementById('fPic').value
+  });
+  if (!res.ok) { document.getElementById('dashCards').innerHTML = `<div class="empty">${res.error}</div>`; return; }
+
+  const s = res.summary;
+  document.getElementById('dashCards').innerHTML = `
+    <div class="stat-card"><div class="n">${s.totalPaket}</div><div class="l">Total Paket</div></div>
+    <div class="stat-card"><div class="n">${s.scanBerhasil}</div><div class="l">Scan Berhasil</div></div>
+    <div class="stat-card"><div class="n">${s.duplicateScan}</div><div class="l">Duplicate Scan</div></div>
+    <div class="stat-card"><div class="n">${s.errorCount}</div><div class="l">Error</div></div>
+  `;
+
+  document.querySelector('#tablePicProd tbody').innerHTML = res.perPic.map(p => `
+    <tr><td>${p.picId}</td><td>${p.picName}</td><td>${p.paket}</td></tr>`).join('') ||
+    '<tr><td colspan="3" class="empty">Belum ada data</td></tr>';
+}
+
+async function doExport() {
+  const { from, to } = computeDateRange();
+  const res = await api('exportData', { picId: session.picId, dateFrom: from, dateTo: to });
+  if (!res.ok) { alert(res.error); return; }
+  if (!res.data.length) { alert('Tidak ada data pada rentang ini.'); return; }
+  const headers = Object.keys(res.data[0]);
+  const csv = [headers.join(',')].concat(
+    res.data.map(row => headers.map(h => `"${String(row[h]).replace(/"/g,'""')}"`).join(','))
+  ).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `dispatch_export_${from}_${to}.csv`;
+  a.click();
+}
+
+/* ==========================================================================
+   TRACE ORDER
+   ========================================================================== */
+document.getElementById('btnTrace').addEventListener('click', doTrace);
+document.getElementById('traceInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') doTrace(); });
+
+async function doTrace() {
+  const resi = document.getElementById('traceInput').value.trim();
+  const box = document.getElementById('traceResult');
+  if (!resi) return;
+  box.innerHTML = '<div class="empty">Mencari...</div>';
+  const res = await api('trace', { resi });
+  if (!res.ok) { box.innerHTML = `<div class="card empty">${res.error}</div>`; return; }
+  const d = res.data;
+  box.innerHTML = `
+    <div class="card">
+      <div class="field-row">
+        <div><label>Nomor Resi</label><div style="font-family:var(--mono);font-size:16px;">${d.resi}</div></div>
+        <div><label>PIC</label><div>${d.picId} — ${d.picName}</div></div>
+        <div><label>Tanggal Scan</label><div>${d.date}</div></div>
+        <div><label>Jam Scan</label><div>${d.time}</div></div>
+      </div>
+      ${d.notes ? `<label>Catatan</label><div style="font-size:13px;color:var(--text-dim);">${d.notes}</div>` : ''}
+      <label>Status</label>
+      <span class="badge ok">${d.status}</span>
+    </div>`;
+}
+
+/* ==========================================================================
+   MANAGE PIC (Admin)
+   ========================================================================== */
+document.getElementById('btnAddPic').addEventListener('click', async () => {
+  const picId = document.getElementById('newPicId').value.trim();
+  const nama = document.getElementById('newPicNama').value.trim();
+  const pin = document.getElementById('newPicPin').value.trim();
+  const role = document.getElementById('newPicRole').value;
+  if (!picId || !nama || !pin) { alert('Lengkapi semua field.'); return; }
+  const res = await api('managePic', { requesterId: session.picId, op: 'add', picId, nama, pin, role });
+  if (res.ok) { refreshPicList(); document.getElementById('newPicId').value=''; document.getElementById('newPicNama').value=''; document.getElementById('newPicPin').value=''; }
+  else alert(res.error);
+});
+
+async function refreshPicList() {
+  const res = await api('listPic');
+  const tbody = document.querySelector('#tablePicList tbody');
+  if (!res.ok) { tbody.innerHTML = `<tr><td colspan="5" class="empty">${res.error}</td></tr>`; return; }
+  tbody.innerHTML = res.data.map(p => `
+    <tr>
+      <td>${p.picId}</td><td>${p.nama}</td><td>${p.role}</td>
+      <td><span class="badge ${p.statusAktif === 'Aktif' ? 'ok' : 'no'}">${p.statusAktif}</span></td>
+      <td><button class="btn-sm ${p.statusAktif === 'Aktif' ? 'btn-danger' : ''}" data-pic="${p.picId}" data-op="${p.statusAktif === 'Aktif' ? 'deactivate' : 'activate'}">
+        ${p.statusAktif === 'Aktif' ? 'Nonaktifkan' : 'Aktifkan'}
+      </button></td>
+    </tr>`).join('');
+  tbody.querySelectorAll('button').forEach(b => b.addEventListener('click', async () => {
+    await api('managePic', { requesterId: session.picId, op: b.dataset.op, picId: b.dataset.pic });
+    refreshPicList();
+  }));
+}
+
+/* ==========================================================================
+   AUDIT LOG (Admin)
+   ========================================================================== */
+async function refreshAuditLog() {
+  const res = await api('auditLog', { picId: session.picId });
+  const tbody = document.querySelector('#tableAudit tbody');
+  if (!res.ok) { tbody.innerHTML = `<tr><td colspan="5" class="empty">${res.error}</td></tr>`; return; }
+  tbody.innerHTML = res.data.map(a => `
+    <tr><td>${a.Timestamp}</td><td>${a.Actor}</td><td>${a.ActorRole}</td><td>${a.Action}</td><td>${a.Detail}</td></tr>
+  `).join('') || '<tr><td colspan="5" class="empty">Belum ada log</td></tr>';
+}
+
+/* ==========================================================================
+   INIT
+   ========================================================================== */
+if (session) {
+  document.getElementById('view-login').classList.add('hidden');
+  document.getElementById('view-main').classList.remove('hidden');
+  enterApp();
+} else {
+  loadPicOptions();
+}
+</script>
+</body>
+</html>
