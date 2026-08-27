@@ -295,7 +295,7 @@
    KONFIGURASI — GANTI DENGAN URL WEB APP APPS SCRIPT ANDA
    ========================================================================== */
 const CONFIG = {
-API_URL: 'https://script.google.com/macros/s/AKfycbxRNK8xSwU1SWipwUieu6kQB3NBXOlFd9zAHPZ0uU_o2C0-DbT_sBAXl2Q3UCDQRdebrw/exec'
+  API_URL: 'PASTE_URL_DEPLOYMENT_APPS_SCRIPT_DI_SINI'
 };
 
 /* ==========================================================================
@@ -372,6 +372,7 @@ async function loadPicOptions() {
 
 document.querySelectorAll('.keypad button').forEach(btn => {
   btn.addEventListener('click', () => {
+    getAudioCtx(); // buka izin audio dari sentuhan pertama pengguna (wajib di HP)
     const k = btn.dataset.k;
     if (k === 'clear') pinBuffer = '';
     else if (k === 'back') pinBuffer = pinBuffer.slice(0, -1);
@@ -410,6 +411,39 @@ document.getElementById('btnLogout').addEventListener('click', () => {
   session = null;
   location.reload();
 });
+
+/* ==========================================================================
+   AUDIO FEEDBACK — beep berbeda untuk BERHASIL / DUPLIKAT / GAGAL
+   ========================================================================== */
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function beep(freq, duration, delay, type, vol) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.value = vol || 0.25;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const t = ctx.currentTime + (delay || 0);
+    osc.start(t);
+    osc.stop(t + duration);
+  } catch (e) {}
+}
+function soundSuccess() { beep(1200, 0.09, 0, 'sine', 0.25); }
+function soundDuplicate() { beep(700, 0.09, 0, 'square', 0.25); beep(700, 0.09, 0.14, 'square', 0.25); }
+function soundFail() { beep(220, 0.22, 0, 'sawtooth', 0.25); }
 
 /* ==========================================================================
    ROUTING SETELAH LOGIN
@@ -510,28 +544,39 @@ function stopCamera() {
 async function processScan(resi) {
   const res = await api('scan', { resi, picId: session.picId, device: navigator.userAgent.slice(0,40) });
   if (res.ok) {
+    soundSuccess();
     showOverlay('success', '✓', 'BERHASIL', [
       'Resi: ' + res.data.resi,
       'PIC: ' + res.data.picName,
       'Status: ' + res.data.status
-    ]);
+    ], 650);
     todayScans.unshift(res.data);
     renderRecentList();
     updateMiniStats();
   } else if (res.duplicate) {
+    soundDuplicate();
     showOverlay('warn', '⚠', 'RESI SUDAH TERDAFTAR', [
       'Resi: ' + res.existing.resi,
       'PIC: ' + res.existing.picId + ' - ' + res.existing.picName,
       'Waktu: ' + res.existing.date + ' ' + res.existing.time
-    ]);
+    ], 2800);
   } else {
-    showOverlay('fail', '✕', 'RESI TIDAK VALID', [res.error || 'Gagal memproses resi']);
+    soundFail();
+    showOverlay('fail', '✕', 'RESI TIDAK VALID', [res.error || 'Gagal memproses resi'], 2800);
   }
   resiInput.focus();
 }
 
-function showOverlay(type, icon, title, lines) {
+let overlayTimeoutId = null;
+let overlayClickHandler = null;
+function showOverlay(type, icon, title, lines, autoCloseMs) {
   const ov = document.getElementById('overlay');
+
+  // Bersihkan timer & listener dari panggilan sebelumnya supaya tidak
+  // tabrakan / menutup overlay yang baru muncul saat scan beruntun cepat.
+  if (overlayTimeoutId) { clearTimeout(overlayTimeoutId); overlayTimeoutId = null; }
+  if (overlayClickHandler) { ov.removeEventListener('click', overlayClickHandler); overlayClickHandler = null; }
+
   ov.className = 'overlay ' + type;
   ov.innerHTML = `
     <div class="icon">${icon}</div>
@@ -539,9 +584,15 @@ function showOverlay(type, icon, title, lines) {
     ${lines.map(l => `<div class="line">${l}</div>`).join('')}
     <div class="tapclose">tap layar untuk lanjut</div>`;
   ov.classList.remove('hidden');
-  const closeFn = () => { ov.classList.add('hidden'); ov.removeEventListener('click', closeFn); };
-  ov.addEventListener('click', closeFn);
-  setTimeout(closeFn, type === 'success' ? 1400 : 3000);
+
+  const close = () => {
+    ov.classList.add('hidden');
+    if (overlayClickHandler) { ov.removeEventListener('click', overlayClickHandler); overlayClickHandler = null; }
+    if (overlayTimeoutId) { clearTimeout(overlayTimeoutId); overlayTimeoutId = null; }
+  };
+  overlayClickHandler = close;
+  ov.addEventListener('click', overlayClickHandler);
+  overlayTimeoutId = setTimeout(close, autoCloseMs || 2000);
 }
 
 function renderRecentList() {
